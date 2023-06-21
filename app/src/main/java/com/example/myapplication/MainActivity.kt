@@ -3,6 +3,7 @@ package com.example.myapplication
 
 import android.content.Context
 import android.os.Bundle
+import android.view.RoundedCorner
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
@@ -23,12 +24,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -37,6 +43,11 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldColors
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,6 +68,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 
 import androidx.compose.ui.unit.dp
@@ -64,14 +78,20 @@ import androidx.compose.ui.unit.sp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.rememberImagePainter
+import com.example.myapplication.states.MainEvent
+import com.example.myapplication.ui.theme.MainViewModel
 import com.example.myapplication.ui.theme.MyApplicationTheme
 import com.example.myapplication.ui.theme.NavyBlue
+import kotlinx.coroutines.flow.update
+import kotlin.system.exitProcess
 
 
 class MainActivity : ComponentActivity() {
 
     lateinit var context: Context
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -79,10 +99,10 @@ class MainActivity : ComponentActivity() {
             MyApplicationTheme {
                 // A surface container using the 'background' color from the theme
                 Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                    modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background
                 ) {
-                    LoginForm()
+                    val viewModel = viewModel<MainViewModel>()
+                    LoginForm(viewModel = viewModel)
                 }
 
 
@@ -92,45 +112,38 @@ class MainActivity : ComponentActivity() {
 }
 
 
-
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginForm(modifier: Modifier = Modifier) {
-
+fun LoginForm(modifier: Modifier = Modifier, viewModel: MainViewModel) {
+    val flowUiState by viewModel.stateFlow.collectAsState()
     ConstraintLayout(
         modifier = modifier
             .fillMaxSize()
-            .background(NavyBlue)
+            .background(NavyBlue),
     ) {
 
         val (box, jsLogo) = createRefs()
 
-        Image(
-            painter = painterResource(id = R.drawable.loginjslogo),
+        Image(painter = painterResource(id = R.drawable.loginjslogo),
             contentDescription = "logo",
             modifier = Modifier
                 .size(150.dp)
                 .constrainAs(jsLogo) {
-                    start.linkTo(parent.start)
-                    end.linkTo(parent.end)
+                    centerHorizontallyTo(parent, 0.5f)
                     top.linkTo(parent.top)
                     bottom.linkTo(box.top)
-                }
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.8f)
-                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                .background(Color.White)
-                .padding(16.dp)
-                .constrainAs(box) {
-                    bottom.linkTo(parent.bottom)
-                    start.linkTo(parent.start)
-                    end.linkTo(parent.end)
-                }
-        ) {
+                })
+        Box(modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight(0.8f)
+            .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+            .background(Color.White)
+            .padding(16.dp)
+            .constrainAs(box) {
+                bottom.linkTo(parent.bottom)
+                start.linkTo(parent.start)
+                end.linkTo(parent.end)
+            }) {
             Column(
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -147,8 +160,13 @@ fun LoginForm(modifier: Modifier = Modifier) {
                     shape = RoundedCornerShape(18.dp)
                 ) {
                     OutlinedTextField(
-                        value = "",
-                        onValueChange = { "" },
+                        value = flowUiState.userNameText,
+                        onValueChange = { newString ->
+                            viewModel.onEvent(MainEvent.ChangeUserNameText(newText = newString))
+                        },
+                        supportingText = {
+                            Text("Error", color = Color.Red)
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),
@@ -164,52 +182,39 @@ fun LoginForm(modifier: Modifier = Modifier) {
                     )
                 }
 
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(1.dp, Color.Gray, RoundedCornerShape(18.dp)),
-                    color = Color.White,
-                    shape = RoundedCornerShape(18.dp)
+                PasswordField(
+                    modifier = Modifier.fillMaxWidth(),
+                    flowUiState.passwordText,
+                    flowUiState.passwordShow,
+                    onValueChange = {
+                        viewModel.onEvent(MainEvent.ChangePasswordText(newText = it))
+                    }
                 ) {
-                    OutlinedTextField(
-                        value = "",
-                        onValueChange = { "" },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp),
-                        placeholder = { Text("Password") },
-                        colors = TextFieldDefaults.outlinedTextFieldColors(
-                            textColor = Color.Black,
-                            disabledTextColor = Color.Gray
-                        ),
-                        singleLine = false
-                    )
+                    viewModel.onEvent(MainEvent.TogglePassword)
                 }
-                Spacer(modifier = Modifier.height(10.dp))
 
                 Button(
-                    onClick = { /*TODO*/ }, modifier = Modifier
-                        .fillMaxWidth(),
+                    onClick = {
+                        exitProcess(0)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = NavyBlue,
                     )
-
                 ) {
                     Text(text = "Login")
                 }
 
                 Spacer(modifier = Modifier.height(30.dp))
-
                 Text(text = "New to JS Mobile? Register here!", color = NavyBlue)
                 Text(text = "Forgot Username / Password / FPIN", color = NavyBlue)
-
                 Row(
                     modifier = Modifier
                         .width(200.dp)
                         .height(50.dp)
                         .clip(RoundedCornerShape(20.dp))
-                        .background("#DCDCDC".getColor()),
+                        .background(if (flowUiState.isJsBotEnable) Color.Black else "#DCDCDC".getColor()),
 
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally)
@@ -245,7 +250,51 @@ fun LoginForm(modifier: Modifier = Modifier) {
 
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PasswordField(
+    modifier: Modifier = Modifier,
+    text: String,
+    isVisible: Boolean,
+    onValueChange: (String) -> Unit,
+    onPasswordToggle: () -> Unit
+) {
+    Surface(
+        modifier
+            .border(1.dp, Color.Gray, RoundedCornerShape(18.dp)),
+        color = Color.White,
+        shape = RoundedCornerShape(18.dp)
+    ) {
+        TextField(
+            modifier = Modifier.background(Color.White),
+            value = text,
+            onValueChange = onValueChange,
+            label = { Text("Password", color = Color.DarkGray) },
+            singleLine = true,
+            visualTransformation = if (isVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            trailingIcon = {
+                val image = if (isVisible) Icons.Filled.Visibility
+                else Icons.Filled.VisibilityOff
 
+                // Please provide localized description for accessibility services
+                val description = if (isVisible) "Hide password" else "Show password"
+
+                IconButton(onClick = {
+                    onPasswordToggle.invoke()
+                }) {
+                    Icon(imageVector = image, description)
+                }
+            },
+            colors = TextFieldDefaults.textFieldColors(
+                containerColor = Color.White
+            )
+
+        )
+    }
+
+
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -266,49 +315,41 @@ fun newFun() {
             value = "",
             onValueChange = {},
 
-            modifier = Modifier
-                .constrainAs(f1) {
-                    linkTo(
-                        start = parent.start,
-                        end = parent.end,
-                        startMargin = 16.dp,
-                        endMargin = 16.dp
-                    )
-                    linkTo(
-                        top = parent.top,
-                        bottom = parent.bottom,
-                        bias = 0.3f,
-                    )
-                    width = Dimension.fillToConstraints
+            modifier = Modifier.constrainAs(f1) {
+                linkTo(
+                    start = parent.start,
+                    end = parent.end,
+                    startMargin = 16.dp,
+                    endMargin = 16.dp
+                )
+                linkTo(
+                    top = parent.top,
+                    bottom = parent.bottom,
+                    bias = 0.3f,
+                )
+                width = Dimension.fillToConstraints
 
 
-                },
+            },
             label = { Text(text = "UserName", fontSize = 16.sp) },
 
 
             )
 
-        TextField(value = "", onValueChange = {},
-            modifier = Modifier
-                .constrainAs(f2) {
-                    top.linkTo(f1.bottom, margin = 16.dp)
-                    start.linkTo(f1.start)
-                    end.linkTo(f1.end)
-                    width = Dimension.fillToConstraints
+        TextField(value = "", onValueChange = {}, modifier = Modifier.constrainAs(f2) {
+            top.linkTo(f1.bottom, margin = 16.dp)
+            start.linkTo(f1.start)
+            end.linkTo(f1.end)
+            width = Dimension.fillToConstraints
 
-                },
-            label = { Text(text = "Email", fontSize = 16.sp) }
-        )
+        }, label = { Text(text = "Email", fontSize = 16.sp) })
 
-        Button(
-            onClick = { },
-            modifier = Modifier
-                .constrainAs(b) {
-                    top.linkTo(f2.bottom, margin = 40.dp)
-                    start.linkTo(parent.start, margin = 10.dp)
-                    end.linkTo(f2.end, margin = 10.dp)
-                    width = Dimension.fillToConstraints
-                }
+        Button(onClick = { }, modifier = Modifier.constrainAs(b) {
+            top.linkTo(f2.bottom, margin = 40.dp)
+            start.linkTo(parent.start, margin = 10.dp)
+            end.linkTo(f2.end, margin = 10.dp)
+            width = Dimension.fillToConstraints
+        }
 
         ) {
             Text(text = "Login")
@@ -324,7 +365,7 @@ fun newFun() {
 fun GreetingPreview() {
     MyApplicationTheme {
         // Greeting("Android")
-
-        LoginForm()
+        val viewModel = viewModel<MainViewModel>()
+        LoginForm(viewModel = viewModel)
     }
 }

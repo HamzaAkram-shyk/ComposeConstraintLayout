@@ -71,6 +71,8 @@ dependencies {
 
     implementation "androidx.compose.material:material-icons-extended:1.4.3"
 
+    implementation "androidx.navigation:navigation-compose:2.7.0-beta01"
+
 //
 //    implementation fileTree(dir: 'libs', include: ['*.jar'])
 //    implementation 'androidx.compose.material:material-components-android:1.0.0-alpha09'
